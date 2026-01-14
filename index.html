@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>AIR Song Editor - Professional Clean</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.all.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0c; --panel: #121216; --primary: #00f2ff;
+            --accent: #ff2d55; --text: #f0f0f5; --border: #25252a;
+            --selected: #7d40ff; --clip-bg: rgba(0, 242, 255, 0.08);
+        }
+        * { box-sizing: border-box; outline: none; }
+        body { 
+            margin: 0; font-family: 'Inter', sans-serif; background: var(--bg); 
+            color: var(--text); display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+        }
+
+        /* --- HEADER CLEAN --- */
+        .header {
+            background: rgba(10, 10, 12, 0.8); backdrop-filter: blur(10px);
+            padding: 15px 30px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center; z-index: 1000;
+        }
+        .logo { font-weight: 900; letter-spacing: 4px; font-size: 18px; color: #fff; display: flex; align-items: center; gap: 10px; }
+        .logo span { color: var(--primary); }
+        
+        .controls { display: flex; gap: 6px; background: var(--panel); padding: 5px; border-radius: 12px; border: 1px solid var(--border); }
+        .btn {
+            background: transparent; border: none; color: #aaa;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px;
+            font-weight: 600; transition: all 0.2s; text-transform: uppercase;
+        }
+        .btn:hover { color: var(--primary); background: rgba(255,255,255,0.05); }
+        .btn-add { color: var(--primary); border: 1px solid rgba(0, 242, 255, 0.3); }
+        .btn-add:hover { background: var(--primary); color: #000; }
+        .btn-export { background: var(--text); color: #000; }
+        .btn-export:hover { background: #fff; transform: scale(1.02); }
+
+        /* --- MAIN LAYOUT --- */
+        .main-container { flex: 1; display: flex; overflow: hidden; }
+        
+        .track-headers { width: 220px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .track-info { 
+            height: 120px; border-bottom: 1px solid var(--border); padding: 20px; 
+            display: flex; flex-direction: column; justify-content: center; transition: 0.3s;
+        }
+        .track-info:hover { background: rgba(255,255,255,0.02); }
+        .track-label { font-size: 10px; color: var(--primary); font-weight: 800; opacity: 0.5; margin-bottom: 4px; }
+        .track-name { font-size: 12px; font-weight: 500; color: #fff; margin-bottom: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        /* --- TIMELINE --- */
+        .timeline { 
+            flex: 1; overflow: auto; position: relative; background-image: radial-gradient(var(--border) 1px, transparent 1px);
+            background-size: 40px 40px; background-attachment: local;
+        }
+        .track-lane { height: 120px; border-bottom: 1px solid var(--border); position: relative; width: 15000px; }
+        
+        .clip {
+            position: absolute; height: 90px; top: 15px; background: var(--clip-bg);
+            border: 1px solid var(--primary); border-radius: 10px; overflow: hidden; cursor: grab;
+            backdrop-filter: blur(5px); transition: box-shadow 0.2s;
+        }
+        .clip.selected { border: 2px solid var(--selected); box-shadow: 0 0 20px rgba(125, 64, 255, 0.4); z-index: 50; }
+        
+        #playhead {
+            position: absolute; top: 0; left: 0; width: 2px; height: 100%;
+            background: var(--accent); z-index: 100; pointer-events: none;
+            box-shadow: 0 0 15px var(--accent);
+        }
+
+        /* --- UI ELEMENTS --- */
+        .vol-slider { 
+            -webkit-appearance: none; width: 100%; height: 3px; background: #333; 
+            border-radius: 5px; accent-color: var(--primary);
+        }
+        .vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: var(--primary); border-radius: 50%; cursor: pointer; }
+        
+        #timer { font-family: 'Inter', monospace; font-weight: 300; font-size: 24px; color: #fff; min-width: 120px; text-align: right; }
+        canvas { width: 100%; height: 100%; pointer-events: none; opacity: 0.7; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo">AIR<span>EDITOR</span></div>
+    
+    <div class="controls">
+        <input type="file" id="audioInput" hidden accept="audio/*">
+        <button class="btn btn-add" id="addBtn">Importar</button>
+        <button class="btn" id="duplicateBtn">Duplicar</button>
+        <button class="btn" id="splitBtn">Cortar</button>
+        <button class="btn" id="deleteBtn" style="color: var(--accent)">Remover</button>
+        <div style="width: 1px; background: var(--border); margin: 0 10px;"></div>
+        <button class="btn" id="playBtn" style="color:#fff">Reproduzir</button>
+        <button class="btn" id="stopBtn">Parar</button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 20px;">
+        <div id="timer">00:00:00</div>
+        <button class="btn btn-export" id="exportBtn">Exportar</button>
+    </div>
+</div>
+
+<div class="main-container">
+    <div class="track-headers" id="headers"></div>
+    <div class="timeline" id="timeline">
+        <div id="playhead"></div>
+        <div id="lanes"></div>
+    </div>
+</div>
+
+<script>
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let clips = [];
+let selectedClipId = null;
+let isPlaying = false;
+let startTime = 0;
+const pxPerSec = 100;
+const TOTAL_TRACKS = 4;
+
+// Inicializa o ambiente 4-Track Moderno
+function initStudio() {
+    const headers = document.getElementById('headers');
+    const lanes = document.getElementById('lanes');
+    for (let i = 0; i < TOTAL_TRACKS; i++) {
+        const h = document.createElement('div');
+        h.className = 'track-info';
+        h.innerHTML = `
+            <span class="track-label">CANAL 0${i+1}</span>
+            <div class="track-name" id="name-t${i}">Silencioso</div>
+            <input type="range" class="vol-slider" id="vol-t${i}" min="0" max="1.5" step="0.01" value="1">
+        `;
+        headers.appendChild(h);
+
+        const l = document.createElement('div');
+        l.className = 'track-lane';
+        l.dataset.laneIndex = i;
+        lanes.appendChild(l);
+    }
+}
+initStudio();
+
+document.getElementById('addBtn').onclick = () => document.getElementById('audioInput').click();
+
+document.getElementById('audioInput').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const buffer = await audioCtx.decodeAudioData(await file.arrayBuffer());
+
+    if (selectedClipId) {
+        const clip = clips.find(c => c.id === selectedClipId);
+        clip.buffer = buffer;
+        clip.duration = buffer.duration;
+        clip.element.style.width = (buffer.duration * pxPerSec) + 'px';
+        document.getElementById(`name-t${clip.lane}`).innerText = file.name;
+        drawWave(clip);
+    } else {
+        const occupiedLanes = clips.map(c => c.lane);
+        let targetLane = 0;
+        for(let i=0; i<TOTAL_TRACKS; i++) {
+            if(!occupiedLanes.includes(i)) { targetLane = i; break; }
+        }
+        addClip(buffer, file.name, targetLane);
+    }
+    e.target.value = '';
+};
+
+function addClip(buffer, name, laneIdx) {
+    const clip = {
+        id: Math.random().toString(36).substr(2, 9),
+        buffer: buffer, offset: 0, trimStart: 0, duration: buffer.duration,
+        lane: laneIdx, element: null, activeSource: null
+    };
+    document.getElementById(`name-t${laneIdx}`).innerText = name;
+    renderClip(clip);
+}
+
+function renderClip(clip) {
+    const lane = document.querySelectorAll('.track-lane')[clip.lane];
+    const el = document.createElement('div');
+    el.className = 'clip';
+    el.id = clip.id;
+    el.style.left = (clip.offset * pxPerSec) + 'px';
+    el.style.width = (clip.duration * pxPerSec) + 'px';
+    el.innerHTML = `<canvas></canvas>`;
+    
+    lane.appendChild(el);
+    clip.element = el;
+    drawWave(clip);
+    
+    el.onmousedown = (e) => {
+        e.stopPropagation();
+        selectClip(clip.id);
+        if (isPlaying) return;
+        
+        let startX = e.clientX;
+        let initL = parseFloat(el.style.left);
+
+        document.onmousemove = (m) => {
+            const dx = m.clientX - startX;
+            const nl = Math.max(0, initL + dx);
+            el.style.left = nl + 'px';
+            clip.offset = nl / pxPerSec;
+        };
+        document.onmouseup = () => document.onmousemove = null;
+    };
+    clips.push(clip);
+    selectClip(clip.id);
+}
+
+function selectClip(id) {
+    selectedClipId = id;
+    document.querySelectorAll('.clip').forEach(el => el.classList.toggle('selected', el.id === id));
+}
+
+// --- ENGINE REPRODUÇÃO ---
+document.getElementById('playBtn').onclick = () => {
+    if (isPlaying || clips.length === 0) return;
+    isPlaying = true;
+    startTime = audioCtx.currentTime;
+    const projectEnd = Math.max(...clips.map(c => c.offset + c.duration));
+
+    clips.forEach(c => {
+        const source = audioCtx.createBufferSource();
+        const gain = audioCtx.createGain();
+        source.buffer = c.buffer;
+        gain.gain.value = document.getElementById(`vol-t${c.lane}`).value;
+        source.connect(gain).connect(audioCtx.destination);
+        source.start(startTime + c.offset, 0, c.duration);
+        c.activeSource = source;
+    });
+
+    (function monitor() {
+        if (!isPlaying) return;
+        const elapsed = audioCtx.currentTime - startTime;
+        document.getElementById('playhead').style.left = (elapsed * pxPerSec) + 'px';
+        document.getElementById('timer').innerText = new Date(elapsed * 1000).toISOString().substr(14, 8);
+        if (elapsed >= projectEnd) stopAll();
+        else requestAnimationFrame(monitor);
+    })();
+};
+
+function stopAll() {
+    isPlaying = false;
+    clips.forEach(c => { if(c.activeSource) { try{c.activeSource.stop()}catch(e){} } });
+    document.getElementById('playhead').style.left = '0px';
+}
+document.getElementById('stopBtn').onclick = stopAll;
+
+// --- EXPORTAÇÃO MP3 ---
+document.getElementById('exportBtn').onclick = async () => {
+    if (clips.length === 0) return;
+    const btn = document.getElementById('exportBtn');
+    btn.innerText = "Calculando...";
+    
+    const maxDur = Math.max(...clips.map(c => c.offset + c.duration));
+    const offline = new OfflineAudioContext(2, maxDur * audioCtx.sampleRate, audioCtx.sampleRate);
+    
+    clips.forEach(c => {
+        const s = offline.createBufferSource();
+        const g = offline.createGain();
+        s.buffer = c.buffer;
+        g.gain.value = document.getElementById(`vol-t${c.lane}`).value;
+        s.connect(g).connect(offline.destination);
+        s.start(c.offset, 0, c.duration);
+    });
+
+    const rendered = await offline.startRendering();
+    const mp3encoder = new lamejs.Mp3Encoder(2, rendered.sampleRate, 192);
+    const mp3Data = [];
+
+    for (let i = 0; i < rendered.length; i += 1152) {
+        const l = new Int16Array(1152), r = new Int16Array(1152);
+        for (let j = 0; j < 1152; j++) {
+            l[j] = (rendered.getChannelData(0)[i+j] || 0) * 0x7FFF;
+            r[j] = (rendered.getChannelData(1)[i+j] || 0) * 0x7FFF;
+        }
+        const buf = mp3encoder.encodeBuffer(l, r);
+        if (buf.length > 0) mp3Data.push(buf);
+    }
+    mp3Data.push(mp3encoder.flush());
+    
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(mp3Data, { type: 'audio/mp3' }));
+    a.download = "AIR_Studio_Mix.mp3";
+    a.click();
+    btn.innerText = "Exportar";
+};
+
+// --- AUXILIARES ---
+document.getElementById('deleteBtn').onclick = () => {
+    if (!selectedClipId) return;
+    const idx = clips.findIndex(c => c.id === selectedClipId);
+    clips[idx].element.remove();
+    clips.splice(idx, 1);
+    selectedClipId = null;
+};
+
+document.getElementById('duplicateBtn').onclick = () => {
+    const t = clips.find(c => c.id === selectedClipId);
+    if (t) addClip(t.buffer, t.id.substr(0,5), t.lane);
+};
+
+function drawWave(clip) {
+    const canvas = clip.element.querySelector('canvas');
+    canvas.width = clip.element.offsetWidth; canvas.height = 90;
+    const ctx = canvas.getContext('2d');
+    const data = clip.buffer.getChannelData(0);
+    const step = Math.ceil(data.length / canvas.width);
+    ctx.strokeStyle = '#00f2ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for(let i=0; i<canvas.width; i++) {
+        let max = 0;
+        for(let j=0; j<step; j++) {
+            const v = Math.abs(data[(i*step)+j]);
+            if(v > max) max = v;
+        }
+        ctx.moveTo(i, 45 - max*40); ctx.lineTo(i, 45 + max*40);
+    }
+    ctx.stroke();
+}
+
+document.getElementById('timeline').onclick = (e) => {
+    if (e.target.classList.contains('track-lane')) {
+        document.getElementById('playhead').style.left = e.offsetX + 'px';
+        selectedClipId = null;
+        document.querySelectorAll('.clip').forEach(el => el.classList.remove('selected'));
+    }
+};
+
+window.onkeydown = (e) => {
+    if (e.key === 'Delete') document.getElementById('deleteBtn').click();
+};
+</script>
+</body>
+</html>
