@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>AIR Song Editor</title>
+    <link rel="icon" href="AIRSongEditor_logo.png" type="image/png">
     
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%2300f2ff%22/><path d=%22M30 50 L45 65 L75 35%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%2210%22/></svg>">
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.all.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&display=swap" rel="stylesheet">
     <style>
@@ -26,16 +25,11 @@
             padding: 15px 30px; border-bottom: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center; z-index: 1000;
         }
+        .logo { font-weight: 900; letter-spacing: 4px; font-size: 18px; color: #fff; display: flex; align-items: center; gap: 15px; }
         
-        /* LOGO ESTILIZADO */
-        .logo { 
-            font-weight: 900; letter-spacing: 4px; font-size: 18px; color: #fff; 
-            display: flex; align-items: center; gap: 12px; 
-            user-select: none;
-        }
-        .logo svg {
-            filter: drop-shadow(0 0 5px rgba(0, 242, 255, 0.6));
-        }
+        /* ESTILO PARA A IMAGEM DO LOGOTIPO */
+        .logo img { height: 32px; width: auto; display: block; }
+        
         .logo span { color: var(--primary); }
         
         .controls { display: flex; gap: 6px; background: var(--panel); padding: 5px; border-radius: 12px; border: 1px solid var(--border); }
@@ -97,12 +91,7 @@
 
 <div class="header">
     <div class="logo">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-            <line x1="12" y1="19" x2="12" y2="23"></line>
-            <line x1="8" y1="23" x2="16" y2="23"></line>
-        </svg>
+        <img src="AIRSongEditor_logo.png" alt="Logo">
         AIR<span>EDITOR</span>
     </div>
     
